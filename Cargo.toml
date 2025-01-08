@@ -10,6 +10,7 @@ path = "src/lib.rs"
 [dependencies]
 regex = "1.11.1"
 
+# day 1
 [[bin]]
 name = "day1-diff"
 path = "src/bin/day1/diff.rs"
@@ -18,3 +19,7 @@ path = "src/bin/day1/diff.rs"
 name = "day1-sim"
 path = "src/bin/day1/sim.rs"
 
+# day 2
+[[bin]]
+name = "day2-safecount"
+path = "src/bin/day2/safecount.rs"
