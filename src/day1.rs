@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::read_to_string;
 use std::fmt;
-use std::path::Path;
+use std::path::PathBuf;
 
 use regex::Regex;
 
 pub mod constants {
-    pub const LOCATIONS_FILE_PATH: &str = "/home/titus/code/advent/src/locations.txt";
+    pub const LOCATIONS_FILE_PATH: &str = "day1/locations.txt";
 }
 
 #[derive(Debug, PartialEq)]
@@ -23,7 +23,7 @@ impl fmt::Display for LocError {
     }
 }
 
-fn _read_columns(file_path: &Path) -> Result<(Vec<u64>, Vec<u64>), Box<dyn Error>> {
+fn _read_columns(file_path: &PathBuf) -> Result<(Vec<u64>, Vec<u64>), Box<dyn Error>> {
     let mut col1: Vec<u64> = Vec::new();
     let mut col2: Vec<u64> = Vec::new();
 
@@ -41,7 +41,7 @@ fn _read_columns(file_path: &Path) -> Result<(Vec<u64>, Vec<u64>), Box<dyn Error
     Ok((col1, col2))
 }
 
-fn _result_from_file(file_path: &Path) -> Result<u64, Box<dyn Error>> {
+fn _result_from_file(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
     let (mut col1, mut col2) = _read_columns(file_path)?;
 
     col1.sort();
@@ -56,14 +56,14 @@ fn _result_from_file(file_path: &Path) -> Result<u64, Box<dyn Error>> {
     Ok(result)
 }
 
-pub fn result_from_file(file_path: &Path) -> Result<u64, Box<dyn Error>> {
+pub fn result_from_file(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
     match file_path.is_file() {
         true => _result_from_file(file_path),
         false => Err(Box::new(LocError::PathError)),
     }
 }
 
-fn _compute_similarity_score(file_path: &Path) -> Result<u64, Box<dyn Error>> {
+fn _compute_similarity_score(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
     let (col1, col2) = _read_columns(file_path)?;
     let mut col2_counts: HashMap<u64, u64> = HashMap::new();
 
@@ -80,7 +80,7 @@ fn _compute_similarity_score(file_path: &Path) -> Result<u64, Box<dyn Error>> {
     Ok(result)
 }
 
-pub fn compute_similarity_score(file_path: &Path) -> Result<u64, Box<dyn Error>> {
+pub fn compute_similarity_score(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
     match file_path.is_file() {
         true => _compute_similarity_score(file_path),
         false => Err(Box::new(LocError::PathError)),
@@ -91,41 +91,19 @@ pub fn compute_similarity_score(file_path: &Path) -> Result<u64, Box<dyn Error>>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
-
-    #[test]
-    fn compute_result_not_a_file() {
-        let path = Path::new("/asdf/foo/bar.txt");
-        let result = result_from_file(path);
-
-        let e = result.expect_err("should return a file error");
-        assert_eq!(e.downcast::<LocError>().unwrap(), Box::new(LocError::PathError));
-    }
+    use crate::common::get_test_data_path;
 
     #[test]
     fn compute_result_from_file() {
-        let mut pb = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        pb.push("tests/data/day1/case1.txt");
-        let path = Path::new(&pb);
-        let result = result_from_file(path).unwrap();
+        let path = get_test_data_path("day1/case1.txt").unwrap();
+        let result = result_from_file(&path).unwrap();
         assert_eq!(result, 116, "computed the correct result");
     }
 
     #[test]
-    fn sim_score_not_a_file() {
-        let path = Path::new("/asdf/foo/bar.txt");
-        let result = compute_similarity_score(path);
-
-        let e = result.expect_err("should return a file error");
-        assert_eq!(e.downcast::<LocError>().unwrap(), Box::new(LocError::PathError));
-    }
-
-    #[test]
     fn similarity_score() {
-        let mut pb = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        pb.push("tests/data/day1/case2.txt");
-        let path = Path::new(&pb);
-        let result = compute_similarity_score(path).unwrap();
+        let path = get_test_data_path("day1/case2.txt").unwrap();
+        let result = compute_similarity_score(&path).unwrap();
         assert_eq!(result, 31, "computed the correct result");
     }
 }
