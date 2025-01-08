@@ -41,7 +41,7 @@ fn _read_columns(file_path: &PathBuf) -> Result<(Vec<u64>, Vec<u64>), Box<dyn Er
     Ok((col1, col2))
 }
 
-fn _result_from_file(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
+pub fn result_from_file(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
     let (mut col1, mut col2) = _read_columns(file_path)?;
 
     col1.sort();
@@ -56,14 +56,7 @@ fn _result_from_file(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
     Ok(result)
 }
 
-pub fn result_from_file(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
-    match file_path.is_file() {
-        true => _result_from_file(file_path),
-        false => Err(Box::new(LocError::PathError)),
-    }
-}
-
-fn _compute_similarity_score(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
+pub fn compute_similarity_score(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
     let (col1, col2) = _read_columns(file_path)?;
     let mut col2_counts: HashMap<u64, u64> = HashMap::new();
 
@@ -78,13 +71,6 @@ fn _compute_similarity_score(file_path: &PathBuf) -> Result<u64, Box<dyn Error>>
     }
 
     Ok(result)
-}
-
-pub fn compute_similarity_score(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
-    match file_path.is_file() {
-        true => _compute_similarity_score(file_path),
-        false => Err(Box::new(LocError::PathError)),
-    }
 }
 
 
