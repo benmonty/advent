@@ -23,3 +23,7 @@ path = "src/bin/day1/sim.rs"
 [[bin]]
 name = "day2-safecount"
 path = "src/bin/day2/safecount.rs"
+
+[[bin]]
+name = "day2-safecount-dampened"
+path = "src/bin/day2/safecount-dampened.rs"
