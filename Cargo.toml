@@ -27,3 +27,12 @@ path = "src/bin/day2/safecount.rs"
 [[bin]]
 name = "day2-safecount-dampened"
 path = "src/bin/day2/safecount-dampened.rs"
+
+# day 3
+[[bin]]
+name = "day3-multiply"
+path = "src/bin/day3/multiply.rs"
+
+[[bin]]
+name = "day3-multiply-cond"
+path = "src/bin/day3/cond_multiply.rs"
