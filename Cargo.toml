@@ -42,6 +42,6 @@ path = "src/bin/day3/cond_multiply.rs"
 name = "day4-1"
 path = "src/bin/day4/1.rs"
 
-#[[bin]]
-#name = "day4-2"
-#path = "src/bin/day4/2.rs"
+[[bin]]
+name = "day4-2"
+path = "src/bin/day4/2.rs"
