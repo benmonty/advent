@@ -1,10 +1,91 @@
 use std::error::Error;
 use std::fs;
+use std::ops::Add;
 use std::path::PathBuf;
 
 pub mod constants {
     pub const WORD_SEARCH_PATH: &str = "day4/word-search.txt";
     pub const NEEDLE: &str = "XMAS";
+}
+
+#[derive(Copy, Clone)]
+struct ColIdx(isize);
+
+impl Add for ColIdx {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
+    }
+}
+impl Add<isize> for ColIdx {
+    type Output = ColIdx;
+
+    fn add(self, other: isize) -> Self {
+        Self(self.0 + other)
+    }
+}
+
+
+#[derive(Copy, Clone)]
+struct RowIdx(isize);
+
+impl Add for RowIdx {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
+    }
+}
+
+impl Add<isize> for RowIdx {
+    type Output = RowIdx;
+
+    fn add(self, other: isize) -> Self {
+        Self(self.0 + other)
+    }
+}
+
+#[derive(Copy, Clone)]
+struct Coord {
+    col: ColIdx,
+    row: RowIdx,
+}
+
+impl Coord {
+    fn from(col: isize, row: isize) -> Self {
+        Self {
+            col: ColIdx(col),
+            row: RowIdx(row),
+        }
+    }
+}
+
+impl Add for Coord {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self{
+            col: self.col + other.col,
+            row: self.row + other.row,
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+struct Query {
+    coord: Coord,
+    value: char,
+}
+
+impl Query {
+
+    fn from(coord: &Coord, value: char) -> Self {
+        Self {
+            coord: *coord,
+            value,
+        }
+    }
 }
 
 struct Puzzle {
@@ -40,218 +121,256 @@ impl Puzzle {
         }
     }
 
-    fn at(&self, col_idx: usize, row_idx: usize) -> char {
-        self.lines[row_idx][col_idx]
+    fn find_all(&self, queries: &Vec<Query>) -> bool {
+        queries.iter().all(|q| self.find(q))
     }
 
-    fn in_bounds(&self, col_idx: isize, row_idx: isize) -> bool {
-        let num_cols: isize = (self.num_cols as isize).try_into().unwrap();
-        let num_rows: isize = (self.num_rows as isize).try_into().unwrap();
+    fn find(&self, query: &Query) -> bool {
+        match self.at(&query.coord) {
+            Some(c) => {
+                c == query.value
+            },
+            None => false,
+        }
+    }
+
+    fn at(&self, coord: &Coord) -> Option<char> {
+        if self._in_bounds(&coord) {
+            let col = usize::try_from(coord.col.0).unwrap();
+            let row = usize::try_from(coord.row.0).unwrap();
+            Some(self.lines[row][col])
+        } else {
+            None
+        }
+    }
+
+    fn _in_bounds(&self, coord: &Coord) -> bool {
+        let col_idx = coord.col.0;
+        let row_idx = coord.row.0;
+        let num_cols = isize::try_from(self.num_cols).unwrap();
+        let num_rows = isize::try_from(self.num_rows).unwrap();
+
         col_idx >= 0 && col_idx < num_cols && row_idx >= 0 && row_idx < num_rows
     }
 }
 
-fn count(puzzle: &Puzzle, col_idx: usize, row_idx: usize, col_offset: &dyn Fn(isize) -> isize, row_offset: &dyn Fn(isize) -> isize) -> usize {
-    let mut eq = true;
-    let icol_idx = col_idx as isize;
-    let irow_idx = row_idx as isize;
+
+fn build_queries(base: &Coord, col_offset: &dyn Fn(isize) -> isize, row_offset: &dyn Fn(isize) -> isize) -> Vec<Query> {
+    let mut queries = Vec::new();
     for (i, c) in constants::NEEDLE.chars().enumerate() {
-        let ith_col = icol_idx + col_offset((i as isize).try_into().unwrap());
-        let ith_row = irow_idx + row_offset((i as isize).try_into().unwrap());
-        let ith_col_u = ith_col as usize;
-        let ith_row_u = ith_row as usize;
-        if !puzzle.in_bounds(ith_col, ith_row) {
-            eq = false;
-        } else if puzzle.at(ith_col_u, ith_row_u) != c {
-            eq = false;
-        }
+        let i = isize::try_from(i).unwrap();
+        let coord = Coord {
+            col: base.col + col_offset(i),
+            row: base.row + row_offset(i),
+        };
+        let q = Query {
+            coord,
+            value: c,
+        };
+        queries.push(q);
     }
-    if eq { 1 } else { 0 }
+    queries
 }
+
 
 fn inc(i: isize) -> isize { i }
 fn dec(i: isize) -> isize { -i }
 fn noop(_i: isize) -> isize { 0 }
 
-fn search_forward(puzzle: &Puzzle, col_idx: usize, row_idx: usize) -> usize {
+
+fn count_forward(puzzle: &Puzzle, base: &Coord) -> usize {
     let col_offset = &inc;
     let row_offset = &noop;
-    count(&puzzle, col_idx, row_idx, col_offset, row_offset)
+    let queries = build_queries(base, col_offset, row_offset);
+    match puzzle.find_all(&queries) {
+        true => 1,
+        false => 0,
+    }
 }
 
-fn search_backward(puzzle: &Puzzle, col_idx: usize, row_idx: usize) -> usize {
+fn count_backward(puzzle: &Puzzle, base: &Coord) -> usize {
     let col_offset = &dec;
     let row_offset = &noop;
-    count(&puzzle, col_idx, row_idx, col_offset, row_offset)
+    let queries = build_queries(base, col_offset, row_offset);
+    match puzzle.find_all(&queries) {
+        true => 1,
+        false => 0,
+    }
 }
 
-fn search_up(puzzle: &Puzzle, col_idx: usize, row_idx: usize) -> usize {
+fn count_up(puzzle: &Puzzle, base: &Coord) -> usize {
     let col_offset = &noop;
     let row_offset = &dec;
-    count(&puzzle, col_idx, row_idx, col_offset, row_offset)
+    let queries = build_queries(base, col_offset, row_offset);
+    match puzzle.find_all(&queries) {
+        true => 1,
+        false => 0,
+    }
 }
 
-fn search_down(puzzle: &Puzzle, col_idx: usize, row_idx: usize) -> usize {
+fn count_down(puzzle: &Puzzle, base: &Coord) -> usize {
     let col_offset = &noop;
     let row_offset = &inc;
-    count(&puzzle, col_idx, row_idx, col_offset, row_offset)
+    let queries = build_queries(base, col_offset, row_offset);
+    match puzzle.find_all(&queries) {
+        true => 1,
+        false => 0,
+    }
 }
 
-fn search_forward_up(puzzle: &Puzzle, col_idx: usize, row_idx: usize) -> usize {
+fn count_forward_up(puzzle: &Puzzle, base: &Coord) -> usize {
     let col_offset = &inc;
     let row_offset = &dec;
-    count(&puzzle, col_idx, row_idx, col_offset, row_offset)
+    let queries = build_queries(base, col_offset, row_offset);
+    match puzzle.find_all(&queries) {
+        true => 1,
+        false => 0,
+    }
 }
 
-fn search_forward_down(puzzle: &Puzzle, col_idx: usize, row_idx: usize) -> usize {
+fn count_forward_down(puzzle: &Puzzle, base: &Coord) -> usize {
     let col_offset = &inc;
     let row_offset = &inc;
-    count(&puzzle, col_idx, row_idx, col_offset, row_offset)
+    let queries = build_queries(base, col_offset, row_offset);
+    match puzzle.find_all(&queries) {
+        true => 1,
+        false => 0,
+    }
 }
 
-fn search_backward_up(puzzle: &Puzzle, col_idx: usize, row_idx: usize) -> usize {
+fn count_backward_up(puzzle: &Puzzle, base: &Coord) -> usize {
     let col_offset = &dec;
     let row_offset = &dec;
-    count(&puzzle, col_idx, row_idx, col_offset, row_offset)
+    let queries = build_queries(base, col_offset, row_offset);
+    match puzzle.find_all(&queries) {
+        true => 1,
+        false => 0,
+    }
 }
 
-fn search_backward_down(puzzle: &Puzzle, col_idx: usize, row_idx: usize) -> usize {
+fn count_backward_down(puzzle: &Puzzle, base: &Coord) -> usize {
     let col_offset = &dec;
     let row_offset = &inc;
-    count(&puzzle, col_idx, row_idx, col_offset, row_offset)
+    let queries = build_queries(base, col_offset, row_offset);
+    match puzzle.find_all(&queries) {
+        true => 1,
+        false => 0,
+    }
 }
 
-fn search_all(puzzle: &Puzzle) -> usize {
+fn count_all(puzzle: &Puzzle) -> usize {
     let mut count = 0;
-    for col_idx in 0..puzzle.num_cols {
-        for row_idx in 0..puzzle.num_rows {
+    for col in 0..puzzle.num_cols {
+        let col = ColIdx(isize::try_from(col).unwrap());
+        for row in 0..puzzle.num_rows {
+            let row = RowIdx(isize::try_from(row).unwrap());
+            let base = Coord { row, col };
             count +=
-                search_forward(puzzle, col_idx, row_idx)
-                + search_backward(puzzle, col_idx, row_idx)
-                + search_up(puzzle, col_idx, row_idx)
-                + search_down(puzzle, col_idx, row_idx)
-                + search_forward_up(puzzle, col_idx, row_idx)
-                + search_forward_down(puzzle, col_idx, row_idx)
-                + search_backward_up(puzzle, col_idx, row_idx)
-                + search_backward_down(puzzle, col_idx, row_idx);
+                count_forward(&puzzle, &base)
+                + count_backward(&puzzle, &base)
+                + count_up(puzzle, &base)
+                + count_down(puzzle, &base)
+                + count_forward_up(puzzle, &base)
+                + count_forward_down(puzzle, &base)
+                + count_backward_up(puzzle, &base)
+                + count_backward_down(puzzle, &base);
         }
     }
     count
 }
 
-struct Target(isize, isize, char);
-
-fn matches_target(puzzle: &Puzzle, col_idx: usize, row_idx: usize, target: &Target) -> bool {
-
-    let mut found = true;
-    let target_col = isize::try_from(col_idx).unwrap() + target.0;
-    let target_row = isize::try_from(row_idx).unwrap() + target.1;
-
-    if !puzzle.in_bounds(target_col, target_row) {
-        found = false;
-    } else {
-        let target_col = (target_col as usize).try_into().unwrap();
-        let target_row = (target_row as usize).try_into().unwrap();
-        if puzzle.at(target_col, target_row) != target.2 {
-            found = false;
-        }
-    }
-    found
+fn find_any_query_group(puzzle: &Puzzle, query_groups: &Vec<Vec<Query>>) -> bool {
+    query_groups.iter().any(|group| puzzle.find_all(&group))
 }
 
-fn found_all_targets(puzzle: &Puzzle, col_idx: usize, row_idx: usize, targets: &Vec<Target>) -> bool {
-    targets.iter().all(|target| matches_target(puzzle, col_idx, row_idx, &target))
-}
-
-fn found_any_target_group(puzzle: &Puzzle, col_idx: usize, row_idx: usize, target_groups: &Vec<Vec<Target>>) -> bool {
-    target_groups.iter().any(|group| found_all_targets(puzzle, col_idx, row_idx, &group))
-}
-
-fn has_vertical(puzzle: &Puzzle, col_idx: usize, row_idx: usize) -> bool {
-    let verticals = vec![
-        vec![
-            Target(0, -1, 'M'),
-            Target(0, 0, 'A'),
-            Target(0, 1, 'S'),
-        ],
-        vec![
-            Target(0, 1, 'M'),
-            Target(0, 0, 'A'),
-            Target(0, -1, 'S'),
-
-        ],
-    ];
-    found_any_target_group(puzzle, col_idx, row_idx, &verticals)
-}
-
-fn has_horizontal(puzzle: &Puzzle, col_idx: usize, row_idx: usize) -> bool {
-    let horizontals = vec![
-        vec![
-            Target(-1, 0, 'M'),
-            Target(0, 0, 'A'),
-            Target(1, 0, 'S'),
-        ],
-        vec![
-            Target(1, 0, 'M'),
-            Target(0, 0, 'A'),
-            Target(-1, 0, 'S'),
-
-        ],
-    ];
-    found_any_target_group(puzzle, col_idx, row_idx, &horizontals)
-}
-
-fn has_pos_diag(puzzle: &Puzzle, col_idx: usize, row_idx: usize) -> bool {
+fn has_pos_diag(puzzle: &Puzzle, base: &Coord) -> bool {
     let pos_diag = vec![
         vec![
-            Target(-1, -1, 'M'),
-            Target(0, 0, 'A'),
-            Target(1, 1, 'S'),
+            Query {
+                coord: *base + Coord::from(-1, -1),
+                value: 'M',
+            },
+            Query {
+                coord: *base + Coord::from(0, 0),
+                value: 'A',
+            },
+            Query {
+                coord: *base + Coord::from(1, 1),
+                value: 'S',
+            },
         ],
         vec![
-            Target(1, 1, 'M'),
-            Target(0, 0, 'A'),
-            Target(-1, -1, 'S'),
-
+            Query {
+                coord: *base + Coord::from(-1, -1),
+                value: 'S',
+            },
+            Query {
+                coord: *base + Coord::from(0, 0),
+                value: 'A',
+            },
+            Query {
+                coord: *base + Coord::from(1, 1),
+                value: 'M',
+            },
         ],
     ];
-    found_any_target_group(puzzle, col_idx, row_idx, &pos_diag)
+    find_any_query_group(puzzle, &pos_diag)
 }
 
-fn has_neg_diag(puzzle: &Puzzle, col_idx: usize, row_idx: usize) -> bool {
+fn has_neg_diag(puzzle: &Puzzle, base: &Coord) -> bool {
     let neg_diag = vec![
         vec![
-            Target(-1, 1, 'M'),
-            Target(0, 0, 'A'),
-            Target(1, -1, 'S'),
+            Query {
+                coord: *base + Coord::from(-1, 1),
+                value: 'M',
+            },
+            Query {
+                coord: *base + Coord::from(0, 0),
+                value: 'A',
+            },
+            Query {
+                coord: *base + Coord::from(1, -1),
+                value: 'S',
+            },
         ],
         vec![
-            Target(1, -1, 'M'),
-            Target(0, 0, 'A'),
-            Target(-1, 1, 'S'),
-
+            Query {
+                coord: *base + Coord::from(-1, 1),
+                value: 'S',
+            },
+            Query {
+                coord: *base + Coord::from(0, 0),
+                value: 'A',
+            },
+            Query {
+                coord: *base + Coord::from(1, -1),
+                value: 'M',
+            },
         ],
     ];
-    found_any_target_group(puzzle, col_idx, row_idx, &neg_diag)
+    find_any_query_group(puzzle, &neg_diag)
 }
 
-fn _log_cross(puzzle: &Puzzle, col_idx: usize, row_idx: usize) {
-    for row_idx in row_idx - 1..=row_idx + 1 {
-        for col_idx in col_idx - 1..=col_idx + 1 {
-            let r_idx = usize::try_from(row_idx).unwrap();
-            let c_idx = usize::try_from(col_idx).unwrap();
-            print!("{}", puzzle.at(c_idx, r_idx));
-        }
-        print!("\n");
-    }
-}
+//fn _log_cross(puzzle: &Puzzle, col_idx: usize, row_idx: usize) {
+//    for row_idx in row_idx - 1..=row_idx + 1 {
+//        for col_idx in col_idx - 1..=col_idx + 1 {
+//            let r_idx = usize::try_from(row_idx).unwrap();
+//            let c_idx = usize::try_from(col_idx).unwrap();
+//            print!("{}", puzzle.at(c_idx, r_idx));
+//        }
+//        print!("\n");
+//    }
+//}
 
 
-fn search_all_crosses(puzzle: &Puzzle) -> usize {
+fn get_x_count(puzzle: &Puzzle) -> usize {
     let mut count = 0;
-    for col_idx in 0..puzzle.num_cols {
-        for row_idx in 0..puzzle.num_rows {
-            if has_neg_diag(puzzle, col_idx, row_idx) && has_pos_diag(puzzle, col_idx, row_idx) {
+    for col in 0..puzzle.num_cols {
+        let col = ColIdx(isize::try_from(col).unwrap());
+        for row in 0..puzzle.num_rows {
+            let row = RowIdx(isize::try_from(row).unwrap());
+            let base = Coord { col, row };
+            if has_neg_diag(&puzzle, &base) && has_pos_diag(&puzzle, &base) {
                 count += 1;
             }
         }
@@ -266,7 +385,7 @@ pub fn count_xmas(word_search: PathBuf) -> Result<usize, Box<dyn Error>> {
 
 pub fn count_xmas_str(puzzle: &str) -> usize {
     let puzzle = Puzzle::from(puzzle);
-    search_all(&puzzle)
+    count_all(&puzzle)
 }
 
 pub fn count_crosses(word_search: PathBuf) -> Result<usize, Box<dyn Error>> {
@@ -276,7 +395,7 @@ pub fn count_crosses(word_search: PathBuf) -> Result<usize, Box<dyn Error>> {
 
 pub fn count_crosses_str(puzzle: &str) -> usize {
     let puzzle = Puzzle::from(puzzle);
-    search_all_crosses(&puzzle)
+    get_x_count(&puzzle)
 }
 
 
