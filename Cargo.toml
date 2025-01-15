@@ -54,3 +54,183 @@ path = "src/bin/day5/1.rs"
 [[bin]]
 name = "day5-2"
 path = "src/bin/day5/2.rs"
+
+# day 6
+[[bin]]
+name = "day6-1"
+path = "src/bin/day6/1.rs"
+
+[[bin]]
+name = "day6-2"
+path = "src/bin/day6/2.rs"
+
+# day 7
+[[bin]]
+name = "day7-1"
+path = "src/bin/day7/1.rs"
+
+[[bin]]
+name = "day7-2"
+path = "src/bin/day7/2.rs"
+
+# day 8
+[[bin]]
+name = "day8-1"
+path = "src/bin/day8/1.rs"
+
+[[bin]]
+name = "day8-2"
+path = "src/bin/day8/2.rs"
+
+# day 9
+[[bin]]
+name = "day9-1"
+path = "src/bin/day9/1.rs"
+
+[[bin]]
+name = "day9-2"
+path = "src/bin/day9/2.rs"
+
+# day 10
+[[bin]]
+name = "day10-1"
+path = "src/bin/day10/1.rs"
+
+[[bin]]
+name = "day10-2"
+path = "src/bin/day10/2.rs"
+
+# day 11
+[[bin]]
+name = "day11-1"
+path = "src/bin/day11/1.rs"
+
+[[bin]]
+name = "day11-2"
+path = "src/bin/day11/2.rs"
+
+# day 12
+[[bin]]
+name = "day12-1"
+path = "src/bin/day12/1.rs"
+
+[[bin]]
+name = "day12-2"
+path = "src/bin/day12/2.rs"
+
+# day 13
+[[bin]]
+name = "day13-1"
+path = "src/bin/day13/1.rs"
+
+[[bin]]
+name = "day13-2"
+path = "src/bin/day13/2.rs"
+
+# day 14
+[[bin]]
+name = "day14-1"
+path = "src/bin/day14/1.rs"
+
+[[bin]]
+name = "day14-2"
+path = "src/bin/day14/2.rs"
+
+# day 15
+[[bin]]
+name = "day15-1"
+path = "src/bin/day15/1.rs"
+
+[[bin]]
+name = "day15-2"
+path = "src/bin/day15/2.rs"
+
+# day 16
+[[bin]]
+name = "day16-1"
+path = "src/bin/day16/1.rs"
+
+[[bin]]
+name = "day16-2"
+path = "src/bin/day16/2.rs"
+
+# day 17
+[[bin]]
+name = "day17-1"
+path = "src/bin/day17/1.rs"
+
+[[bin]]
+name = "day17-2"
+path = "src/bin/day17/2.rs"
+
+# day 18
+[[bin]]
+name = "day18-1"
+path = "src/bin/day18/1.rs"
+
+[[bin]]
+name = "day18-2"
+path = "src/bin/day18/2.rs"
+
+# day 19
+[[bin]]
+name = "day19-1"
+path = "src/bin/day19/1.rs"
+
+[[bin]]
+name = "day19-2"
+path = "src/bin/day19/2.rs"
+
+# day 20
+[[bin]]
+name = "day20-1"
+path = "src/bin/day20/1.rs"
+
+[[bin]]
+name = "day20-2"
+path = "src/bin/day20/2.rs"
+
+# day 21
+[[bin]]
+name = "day21-1"
+path = "src/bin/day21/1.rs"
+
+[[bin]]
+name = "day21-2"
+path = "src/bin/day21/2.rs"
+
+# day 22
+[[bin]]
+name = "day22-1"
+path = "src/bin/day22/1.rs"
+
+[[bin]]
+name = "day22-2"
+path = "src/bin/day22/2.rs"
+
+# day 23
+[[bin]]
+name = "day23-1"
+path = "src/bin/day23/1.rs"
+
+[[bin]]
+name = "day23-2"
+path = "src/bin/day23/2.rs"
+
+# day 24
+[[bin]]
+name = "day24-1"
+path = "src/bin/day24/1.rs"
+
+[[bin]]
+name = "day24-2"
+path = "src/bin/day24/2.rs"
+
+# day 25
+[[bin]]
+name = "day25-1"
+path = "src/bin/day25/1.rs"
+
+[[bin]]
+name = "day25-2"
+path = "src/bin/day25/2.rs"
