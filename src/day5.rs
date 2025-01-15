@@ -56,20 +56,6 @@ impl OrderingRules {
         self.rules_map.contains_key(&key)
     }
 
-    //pub fn filter_for_update(&self, update: &Update) -> Self {
-    //    let update_pages: HashSet<usize> = update.page_numbers.iter().cloned().collect();
-    //    let mut result = OrderingRules::new();
-    //    for rule in self.rules.iter() {
-    //        if update_pages.contains(&rule.before) && update_pages.contains(&rule.after) {
-    //            result.rules.push(rule.clone());
-    //            let min = cmp::min(rule.before, rule.after);
-    //            let max = cmp::max(rule.before, rule.after);
-    //            result.rules_map.entry((min, max)).or_insert(rule.clone());
-    //        }
-    //    }
-    //    result
-    //}
-
     pub fn get_comparator<'a>(&'a self) -> Box<dyn FnMut(&usize, &usize) -> Ordering + 'a> {
         Box::new(move |a: &usize, b: &usize| {
             let min = cmp::min(a, b);
@@ -149,14 +135,6 @@ impl PrintUpdates {
         self.updates.iter()
     }
 
-    //pub fn filter_for_update(&self, update: &Update) -> Self {
-    //    let mut result = Self::new();
-    //    result.updates.push(Update {
-    //        page_numbers: update.page_numbers.iter().cloned().collect(),
-    //    });
-    //    result
-    //}
-
     pub fn at(&self, idx: usize) -> &Update {
         &self.updates[idx]
     }
@@ -207,15 +185,6 @@ impl PrintInstructions {
         }
     }
 
-    //pub fn filter_for_update(&self, update: &Update) -> Self {
-    //    let mut updates = PrintUpdates::new();
-    //    updates.add(update.clone());
-    //    Self {
-    //        rules: self.rules.filter_for_update(update),
-    //        updates,
-    //    }
-    //}
-
     pub fn print(&self) {
         println!("{}", self.rules.to_string());
         println!("{}", self.updates.to_string());
@@ -245,15 +214,46 @@ pub fn _compute_part1_solution(raw_details: &String) -> usize {
     result
 }
 
+pub fn compute_part2_solution(path: &PathBuf) -> usize {
+    let raw_details =  fs::read_to_string(path).unwrap();
+    _compute_part2_solution(&raw_details)
+}
+
+pub fn _compute_part2_solution(raw_details: &String) -> usize {
+    let instructions = PrintInstructions::from(&raw_details);
+
+    let mut corrected_updates: Vec<Update> = Vec::new();
+    for update in instructions.updates.iter() {
+        let expected_update = instructions.get_ordered_update(&update);
+        if update.page_numbers != expected_update.page_numbers {
+            corrected_updates.push(expected_update);
+        }
+    }
+    let mut result = 0;
+    for update in corrected_updates {
+        let num_pages = update.page_numbers.len();
+        result += update.page_numbers[num_pages/2];
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests  {
     use super::*;
     use crate::common;
+
     #[test]
     fn test_example() {
         let path = common::get_test_data_path("day5/case1.txt").unwrap();
         let result = compute_part1_solution(&path);
-        assert_eq!(result, 143, "computes ordering and sums correctly");
+        assert_eq!(result, 143, "computes ordering and sums correctly pt1");
+    }
+
+    #[test]
+    fn test_example_day2() {
+        let path = common::get_test_data_path("day5/case1.txt").unwrap();
+        let result = compute_part2_solution(&path);
+        assert_eq!(result, 123, "computes ordering and sums correctly pt2");
     }
 }
 

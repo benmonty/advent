@@ -51,6 +51,6 @@ path = "src/bin/day4/2.rs"
 name = "day5-1"
 path = "src/bin/day5/1.rs"
 
-#[[bin]]
-#name = "day5-2"
-#path = "src/bin/day5/2.rs"
+[[bin]]
+name = "day5-2"
+path = "src/bin/day5/2.rs"
