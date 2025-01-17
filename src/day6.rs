@@ -1,8 +1,9 @@
 use std::fs;
 use std::path::PathBuf;
 use std::fmt;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::collections::hash_map::Entry;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 pub mod constants {
     pub const INPUT_PATH: &str = "day6/input.txt";
@@ -96,8 +97,8 @@ impl Tile {
 }
 
 struct LabMap {
-    tiles: HashMap<Pos, Tile>,
-    visits: HashSet<Pos>,
+    tiles: FxHashMap<Pos, Tile>,
+    visits: FxHashSet<Pos>,
     num_rows: usize,
     num_cols: usize,
     guard_pos: Option<Pos>,
@@ -107,11 +108,11 @@ impl LabMap {
 
     fn new(num_cols: usize, num_rows: usize) -> Self {
         Self {
-            tiles: HashMap::new(),
+            tiles: FxHashMap::default(),
             num_rows,
             num_cols,
             guard_pos: None,
-            visits: HashSet::new(),
+            visits: FxHashSet::default(),
         }        
     }
 
@@ -238,12 +239,13 @@ impl LabMap {
     }
 
     fn clear_visits(&mut self) {
-        self.visits = HashSet::new();
+        self.visits.drain();
     }
 
     fn sync_state_history(&mut self, history: &Vec<GuardState>) {
         self.clear_visits();
         self.clear_guard();
+        self.visits.reserve(history.len());
         for state in history.iter() {
             self.visits.insert(state.pos);
         }
@@ -379,10 +381,9 @@ fn resume_walk(map: &mut LabMap, history: &Vec<GuardState>) -> Option<VecDeque<G
     map.sync_state_history(history);
     //println!("{}", map);
     let mut rest_of_walk = VecDeque::new();
-    let mut visits: HashSet<(Pos, Orientation)> = HashSet::new();
+    let mut visits: FxHashSet<(Pos, Orientation)> = FxHashSet::default();
     //let start_pos = history.last().unwrap().pos;
     //let start_orientation = history.last().unwrap().orientation;
-    let mut overlaps = 0;
     'walk_path: loop {
         let guard_pos = map.guard_pos.unwrap();
         let mut guard = map.take_guard(guard_pos);
@@ -426,7 +427,8 @@ pub fn _solution2(input: &String) -> usize {
     let mut history = vec![GuardState { pos: guard_pos, orientation: guard.orientation }];
     let mut rest_of_walk = resume_walk(&mut map, &history).unwrap();
     let mut num_cycles = 0;
-    let mut invalid_placements = HashSet::new();
+    let mut invalid_placements = FxHashSet::default();
+    invalid_placements.reserve(rest_of_walk.len());
     invalid_placements.insert(history[0].pos);
     while rest_of_walk.len() != 0 {
         let obs_pos = rest_of_walk[0].pos;
