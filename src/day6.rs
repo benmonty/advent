@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 use std::fmt;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::collections::hash_map::Entry;
 
 pub mod constants {
@@ -11,12 +11,13 @@ pub mod constants {
 type Pos = (usize, usize);
 type IPos = (isize, isize);
 
-
 enum Occupant {
     Guard(Guard),
     Obstacle(Obstacle),
+    CustomObstacle(CustomObstacle),
 }
 
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
 enum Orientation {
     Up,
     Down,
@@ -58,9 +59,17 @@ impl Obstacle {
     }
 }
 
+struct CustomObstacle {
+}
+
+impl CustomObstacle {
+    fn symbol(&self) -> char {
+        'O'
+    }
+}
+
 struct Tile {
     occupant: Option<Occupant>,
-    visited: bool,
 }
 
 impl Tile {
@@ -88,6 +97,7 @@ impl Tile {
 
 struct LabMap {
     tiles: HashMap<Pos, Tile>,
+    visits: HashSet<Pos>,
     num_rows: usize,
     num_cols: usize,
     guard_pos: Option<Pos>,
@@ -101,6 +111,7 @@ impl LabMap {
             num_rows,
             num_cols,
             guard_pos: None,
+            visits: HashSet::new(),
         }        
     }
 
@@ -124,7 +135,7 @@ impl LabMap {
         );
 
         match self.tiles.entry(pos) {
-            Entry::Vacant(entry) => entry.insert(Tile { occupant: None, visited: false }),
+            Entry::Vacant(entry) => entry.insert(Tile { occupant: None }),
             Entry::Occupied(_entry) => panic!("attempting to place tile where another tile exists ({}, {})", x_pos, y_pos),
         };
     }
@@ -136,13 +147,16 @@ impl LabMap {
 
     fn place_guard(&mut self, pos: Pos, guard: Guard) {
         self.place(pos, Occupant::Guard(guard));
-        let tile = self.tiles.get_mut(&pos).unwrap();
-        tile.visited = true;
+        self.visits.insert(pos);
         self.guard_pos = Some(pos);
     }
 
     fn place_obstacle(&mut self, pos: Pos, obstacle: Obstacle) {
         self.place(pos, Occupant::Obstacle(obstacle))
+    }
+
+    fn place_custom_obstacle(&mut self, pos: Pos, obstacle: CustomObstacle) {
+        self.place(pos, Occupant::CustomObstacle(obstacle))
     }
 
     fn take_guard(&mut self, pos: Pos) -> Guard {
@@ -154,11 +168,25 @@ impl LabMap {
         }
     }
 
+    fn clear_guard(&mut self) {
+        if let Some(pos) = self.guard_pos {
+            self.take_guard(pos);
+        }
+    }
+
     fn take_obstacle(&mut self, pos: Pos) -> Obstacle {
         let tile = self.tiles.get_mut(&pos).unwrap();
          match tile.take() {
             Occupant::Obstacle(obs) => obs,
-            _ => panic!("guard not occupying tile for take"),
+            _ => panic!("obstacle not occupying tile for take"),
+        }
+    }
+
+    fn take_custom_obstacle(&mut self, pos: Pos) -> CustomObstacle {
+        let tile = self.tiles.get_mut(&pos).unwrap();
+         match tile.take() {
+            Occupant::CustomObstacle(obs) => obs,
+            _ => panic!("custom obstacle not occupying tile for take"),
         }
     }
 
@@ -209,6 +237,20 @@ impl LabMap {
         map
     }
 
+    fn clear_visits(&mut self) {
+        self.visits = HashSet::new();
+    }
+
+    fn sync_state_history(&mut self, history: &Vec<GuardState>) {
+        self.clear_visits();
+        self.clear_guard();
+        for state in history.iter() {
+            self.visits.insert(state.pos);
+        }
+        let last_state = history.last().unwrap();
+        self.place_guard(last_state.pos, Guard { orientation: last_state.orientation });
+    }
+
     fn count_tiles(&self, filter: Box<dyn Fn(&Tile) -> bool>) -> usize {
         let mut count = 0;
         for y in 0..self.num_rows {
@@ -227,14 +269,16 @@ impl fmt::Display for LabMap {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for y in 0..self.num_rows {
             for x in 0..self.num_cols {
-                let tile = self.tiles.get(&(x, y)).unwrap();
+                let pos = (x, y);
+                let tile = self.tiles.get(&pos).unwrap();
                 let c = match &tile.occupant {
-                    None => match tile.visited {
+                    None => match self.visits.contains(&pos) {
                         true => 'X',
                         false => '.',
                     },
                     Some(Occupant::Guard(guard)) => guard.symbol(),
                     Some(Occupant::Obstacle(obs)) => obs.symbol(),
+                    Some(Occupant::CustomObstacle(obs)) => obs.symbol(),
                 };
                 write!(f, "{}", c).expect("error writing");
             }
@@ -285,7 +329,6 @@ pub fn _solution1(input: &String) -> usize {
                 let next_pos = to_pos(next_ipos);
                 if map.vacant_at(next_pos) {
                     map.place_guard(next_pos, guard);
-                    println!("{}", map);
                     break 'next_step;
                 } else {
                     guard.turn_right();
@@ -296,10 +339,7 @@ pub fn _solution1(input: &String) -> usize {
             }
         };
     };
-    map.count_tiles(Box::new(|tile| {
-        tile.visited
-    }))
-
+    map.visits.len()
 }
 
 //pub fn solution1(path: &PathBuf) -> usize {
@@ -310,7 +350,7 @@ pub fn _solution1(input: &String) -> usize {
 //pub fn _solution1(input: &String) -> usize {
 //    let mut map = LabMap::from_str(&input);
 //    loop {
-//        match map.move_guard() {
+//        match map.move_guard() {k
 //            Movement::OffMap => break,
 //            _ => (),
 //        }
@@ -328,8 +368,82 @@ pub fn solution2(path: &PathBuf) -> usize {
     _solution2(&input)
 }
 
-pub fn _solution2(_input: &String) -> usize {
-    0
+struct GuardState {
+    pos: Pos,
+    orientation: Orientation,
+}
+
+fn resume_walk(map: &mut LabMap, history: &Vec<GuardState>) -> Option<VecDeque<GuardState>> {
+    //println!("RESUME");
+    //println!("history({})", history.len());
+    map.sync_state_history(history);
+    //println!("{}", map);
+    let mut rest_of_walk = VecDeque::new();
+    let mut visits: HashSet<(Pos, Orientation)> = HashSet::new();
+    //let start_pos = history.last().unwrap().pos;
+    //let start_orientation = history.last().unwrap().orientation;
+    let mut overlaps = 0;
+    'walk_path: loop {
+        let guard_pos = map.guard_pos.unwrap();
+        let mut guard = map.take_guard(guard_pos);
+
+        'next_step: loop {
+            let next_ipos = get_forward_step_pos(guard_pos, &guard);
+            if map.in_bounds_at(next_ipos) {
+                let next_pos = to_pos(next_ipos);
+                if map.vacant_at(next_pos) {
+                    rest_of_walk.push_back(GuardState{
+                        pos: next_pos,
+                        orientation: guard.orientation,
+                    });
+                    if visits.contains(&(next_pos, guard.orientation)) {
+                        //println!("CYCLE");
+                        //println!("{}", map);
+                        return None; // cycle detected
+                    } else {
+                        visits.insert((next_pos, guard.orientation));
+                    }
+                    map.place_guard(next_pos, guard);
+                    break 'next_step;
+                } else {
+                    guard.turn_right();
+                }
+            } else {
+                // guard walked off the map
+                break 'walk_path;
+            }
+        };
+    };
+    //println!("NOCYCLE");
+    //println!("{}", map);
+    Some(rest_of_walk)
+}
+
+pub fn _solution2(input: &String) -> usize {
+    let mut map = LabMap::from_str(&input);
+    let guard_pos = map.guard_pos.clone().unwrap();
+    let guard = map.take_guard(guard_pos);
+    let mut history = vec![GuardState { pos: guard_pos, orientation: guard.orientation }];
+    let mut rest_of_walk = resume_walk(&mut map, &history).unwrap();
+    let mut num_cycles = 0;
+    let mut invalid_placements = HashSet::new();
+    invalid_placements.insert(history[0].pos);
+    while rest_of_walk.len() != 0 {
+        let obs_pos = rest_of_walk[0].pos;
+        if invalid_placements.contains(&obs_pos) {
+            history.push(rest_of_walk.pop_front().unwrap());
+            continue;
+        }
+        map.place_custom_obstacle(obs_pos, CustomObstacle {});
+        match resume_walk(&mut map, &history) {
+            None => num_cycles += 1,
+            _ => (), // completed, throw away the walk
+        }
+        map.take_custom_obstacle(obs_pos);
+        invalid_placements.insert(obs_pos);
+        history.push(rest_of_walk.pop_front().unwrap());
+    }
+    num_cycles
 }
 
 #[cfg(test)]
@@ -349,8 +463,10 @@ mod tests  {
         assert_eq!(result, 41, "counts guard path correctly")
     }
 
-    //#[test]
-    //fn test_example_day2() {
-    //    assert!(false, "todo")
-    //}
+    #[test]
+    fn test_example_day2() {
+        let path = common::get_test_data_path("day6/case1.txt").unwrap();
+        let result = solution2(&path);
+        assert_eq!(result, 6, "counts guard path correctly")
+    }
 }
