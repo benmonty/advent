@@ -1,12 +1,12 @@
 use std::fs;
 use std::path::PathBuf;
 use std::collections::VecDeque;
-use num_bigint::BigUint;
 
 #[derive(Clone)]
 pub enum Operator {
     Plus,
     Mult,
+    Concat,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -19,7 +19,7 @@ pub mod constants {
     pub const INPUT_PATH: &str = "day7/input.txt";
 }
 
-pub fn solution1(path: &PathBuf) -> BigUint {
+pub fn solution1(path: &PathBuf) -> u128 {
     let input =  fs::read_to_string(path).unwrap();
     _solution1(&input)
 }
@@ -50,7 +50,7 @@ fn _find_op_sequence(eq_data: &EqData, valid_ops: &Vec<Operator>, acc: u128, rem
         return None;
     }
     for op in valid_ops.iter() {
-        let next_acc;
+        let next_acc: u128;
         let is_overflow;
         let next_operand = remaining.pop_front().unwrap();
         ops.push(op.clone());
@@ -70,6 +70,10 @@ fn _find_op_sequence(eq_data: &EqData, valid_ops: &Vec<Operator>, acc: u128, rem
                 if is_overflow {
                     println!("overflowing mult");
                 }
+            },
+            Operator::Concat => {
+                let next_acc_str = format!("{}{}", acc, next_operand);
+                next_acc = next_acc_str.parse().unwrap();
             },
         }
         match _find_op_sequence(eq_data, valid_ops, next_acc, remaining, ops) {
@@ -119,13 +123,11 @@ pub fn find_op_sequence(eq_data: &EqData, valid_ops: &Vec<Operator>) -> Option<V
 //    false
 //}
 
-pub fn _solution1(input: &String) -> BigUint {
+pub fn _solution1(input: &String) -> u128 {
     let test_eqs = parse_input(&input);
     println!("found {} equations", test_eqs.len());
     let ops = vec![Operator::Plus, Operator::Mult];
-    let mut result = BigUint::from(0u64);
-    let mut r = 0u128;
-    let mut is_overflow;
+    let mut result = 0u128;
     for test_eq in test_eqs.iter() {
         //if rand_find_match(&test_eq, &ops) {
         //    let result_part = BigUint::from(test_eq.solution);
@@ -140,11 +142,7 @@ pub fn _solution1(input: &String) -> BigUint {
         match find_op_sequence(&test_eq, &ops) {
             Some(_op_seq) => {
                 //check_solution(&test_eq, &_op_seq);
-                let result_part = BigUint::from(test_eq.solution);
-                result += result_part;
-                (r, is_overflow) = r.overflowing_add(test_eq.solution);
-                println!("{}\t{}", result, is_overflow);
-                assert!(!is_overflow, "is overflowx");
+                result += test_eq.solution;
             },
             _ => (),
         }
@@ -158,7 +156,30 @@ pub fn solution2(path: &PathBuf) -> u128 {
 }
 
 pub fn _solution2(input: &String) -> u128 {
-    0
+    let test_eqs = parse_input(&input);
+    println!("found {} equations", test_eqs.len());
+    let ops = vec![Operator::Plus, Operator::Mult, Operator::Concat];
+    let mut result = 0u128;
+    for test_eq in test_eqs.iter() {
+        //if rand_find_match(&test_eq, &ops) {
+        //    let result_part = BigUint::from(test_eq.solution);
+        //    result += result_part;
+        //    match find_op_sequence(&test_eq, &ops) {
+        //        None => {
+        //            println!("BAD CASE: {}", test_eq.solution);
+        //        }
+        //        _ => (),
+        //    }
+        //}
+        match find_op_sequence(&test_eq, &ops) {
+            Some(_op_seq) => {
+                //check_solution(&test_eq, &_op_seq);
+                result += test_eq.solution;
+            },
+            _ => (),
+        }
+    }
+    result
 }
 
 #[cfg(test)]
@@ -192,8 +213,10 @@ mod tests  {
         assert_eq!(result, 3749);
     }
     
-    //#[test]
-    //fn test_solution2() {
-    //    assert!(false, "todo")
-    //}
+    #[test]
+    fn test_solution2() {
+        let path = common::get_test_data_path("day7/case1.txt").unwrap();
+        let result = solution2(&path);
+        assert_eq!(result, 11387);
+    }
 }
