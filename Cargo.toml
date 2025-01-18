@@ -8,6 +8,8 @@ name = "advent"
 path = "src/lib.rs"
 
 [dependencies]
+num-bigint = "0.4.6"
+rand = "0.8.5"
 regex = "1.11.1"
 rustc-hash = "2.1.0"
 
