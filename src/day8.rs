@@ -85,7 +85,7 @@ impl CityMap {
     }
 
     // for a location pair, there should be two antinodes
-    pub fn antinode_locations(&self, coord_pair: (Ipos, Ipos)) -> (Ipos, Ipos) {
+    pub fn antinode_locations_1(&self, coord_pair: (Ipos, Ipos)) -> (Ipos, Ipos) {
         let first = coord_pair.0;
         let second = coord_pair.1;
 
@@ -97,6 +97,46 @@ impl CityMap {
         let loc_2 = (first.0 - x_diff, first.1 - y_diff);
 
         (loc_1, loc_2)
+    }
+
+    pub fn antinode_locations_2(&self, coord_pair: (Ipos, Ipos)) -> Vec<Ipos> {
+        let mut locations = Vec::new();
+
+        // each pair creates antinodes at their locs
+        locations.push(coord_pair.0);
+        locations.push(coord_pair.1);
+
+        let first = coord_pair.0;
+        let second = coord_pair.1;
+
+        // create a vector
+        let x_diff = second.0 - first.0;
+        let y_diff = second.1 - first.1;
+
+        // inc loop
+        let mut multiplier = 1;
+        loop {
+            let loc = (second.0 + multiplier*x_diff, second.1 + multiplier*y_diff);
+            if self.contains(loc) {
+                locations.push(loc);
+                multiplier += 1;
+            } else {
+                break;
+            }
+
+        }
+
+        multiplier = 1;
+        loop {
+            let loc = (first.0 - multiplier*x_diff, first.1 - multiplier*y_diff);
+            if self.contains(loc) {
+                locations.push(loc);
+                multiplier += 1;
+            } else {
+                break;
+            }
+        }
+        locations
     }
 
     pub fn contains(&self, pos: Ipos) -> bool {
@@ -130,7 +170,7 @@ pub fn _solution1(input: &String) -> usize {
         match city_map.coord_pairs_for_antenna(antenna) {
             Some(coord_pairs) => {
                 for coord_pair in coord_pairs {
-                    let antinodes = city_map.antinode_locations(coord_pair);
+                    let antinodes = city_map.antinode_locations_1(coord_pair);
                     if city_map.contains(antinodes.0) {
                         antinode_locations.insert(antinodes.0);
                     }
@@ -152,7 +192,26 @@ pub fn solution2(path: &PathBuf) -> usize {
 }
 
 pub fn _solution2(input: &String) -> usize {
-    0
+    let city_map = CityMap::from(input);
+    let mut antinode_locations: HashSet<Ipos> = HashSet::new();
+
+    for antenna in city_map.antenna_iter() {
+        match city_map.coord_pairs_for_antenna(antenna) {
+            Some(coord_pairs) => {
+                for coord_pair in coord_pairs {
+                    let antinodes = city_map.antinode_locations_2(coord_pair);
+                    for antinode_pos in antinodes {
+                        if city_map.contains(antinode_pos) {
+                            antinode_locations.insert(antinode_pos);
+                        }
+                    }
+                }
+
+            },
+            None => (),
+        }
+    }
+    antinode_locations.len()
 }
 
 #[cfg(test)]
@@ -169,6 +228,8 @@ mod tests  {
 
     #[test]
     fn test_example_day8_2() {
-        assert!(false, "todo")
+        let path = common::get_test_data_path("day8/case1.txt").unwrap();
+        let result = solution2(&path);
+        assert_eq!(result, 34);
     }
 }
