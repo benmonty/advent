@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::fmt;
+use std::collections::HashMap;
 
 pub mod constants {
     pub const INPUT_PATH: &str = "day9/input.txt";
@@ -9,6 +10,7 @@ pub mod constants {
 
 type FileId = usize;
 type BlockId = usize;
+type BlockIndex = usize;
 
 struct DiskMap {
     entries: Vec<DiskMapEntry>,
@@ -44,6 +46,7 @@ impl DiskMap {
 struct Disk {
     blocks: Vec<Rc<Block>>,
     files: Vec<File>,
+    file_ptrs: HashMap<FileId, BlockIndex>,
 }
 
 impl Disk {
@@ -52,10 +55,12 @@ impl Disk {
         Disk {
             blocks: Vec::new(),
             files: Vec::new(),
+            file_ptrs: HashMap::new(),
         }
     }
 
     pub fn append_file(&mut self, file: File) {
+        self.file_ptrs.entry(file.id).or_insert(self.blocks.len());
         for block in file.blocks.iter() {
             self.blocks.push(Rc::clone(&block))
         }
@@ -99,13 +104,34 @@ impl Disk {
         if starting_block >= self.blocks.len() {
             panic!("attempting to access out of bounds block");
         }
-        for i in starting_block.. {
+        for i in starting_block..self.blocks.len() {
             match *self.blocks[i] {
                 Block::Free => return Some(i),
                 _ => (),
             }
         }
         return None
+    }
+
+    pub fn find_first_contiguous_free(&self, num_blocks: usize, ending_at: BlockIndex) -> Option<usize> {
+        let mut free_count = 0;
+        let mut range_start = 0;
+        for i in 0..ending_at {
+            match *self.blocks[i] {
+                Block::Free => {
+                    free_count += 1;
+                    if free_count == num_blocks {
+                        return Some(range_start);
+                    }
+                },
+                _ => {
+                    range_start = i + 1;
+                    free_count = 0;
+                },
+            }
+        }
+        return None
+
     }
 
     pub fn find_last_data(&self, end_block: usize) -> Option<usize> {
@@ -140,6 +166,15 @@ impl Disk {
         self.blocks.swap(idx_a, idx_b);
     }
 
+    pub fn mv_file(&mut self, file_id: FileId, new_idx: BlockIndex) {
+        let current_file_idx = self.file_ptrs.get(&file_id).unwrap().clone();
+        let num_blocks = self.files[file_id].blocks.len();
+        for offset in 0..num_blocks {
+            self.swap_blocks(new_idx + offset, current_file_idx + offset);
+        }
+        self.file_ptrs.entry(file_id).and_modify(|ptr| *ptr = new_idx);
+    }
+
     pub fn compress(&mut self) {
         match (self.find_first_free(0), self.find_last_data(self.blocks.len())) {
             (Some(mut free_ptr), Some(mut data_ptr)) => {
@@ -155,6 +190,23 @@ impl Disk {
                 }
             },
             _ => (),
+        }
+    }
+
+    pub fn compress_no_frag(&mut self) {
+        for i in (0..self.files.len()).rev() {
+            let free_at = self.find_first_contiguous_free(
+                self.files[i].blocks.len(),
+                *self.file_ptrs.get(&self.files[i].id).unwrap(),
+            );
+            match free_at {
+                Some(free_at) => {
+                    let file_id = self.files[i].id;
+                    self.mv_file(file_id, free_at);
+                },
+                None => (),
+            }
+
         }
     }
 }
@@ -242,7 +294,10 @@ pub fn solution2(path: &PathBuf) -> usize {
 }
 
 pub fn _solution2(input: &String) -> usize {
-    0
+    let disk_map = DiskMap::from(&input);
+    let mut disk = Disk::from(&disk_map);
+    disk.compress_no_frag();
+    disk.checksum()
 }
 
 #[cfg(test)]
@@ -315,6 +370,11 @@ mod tests  {
                     Rc::new(Block::File(2, 3)),
                     Rc::new(Block::File(2, 4)),
                 ],
+                file_ptrs: HashMap::from([
+                    (0, 0),
+                    (1, 3),
+                    (2, 10),
+                ]),
             }
         );
     }
@@ -334,9 +394,10 @@ mod tests  {
         let path = common::get_test_data_path("day9/case1.txt").unwrap();
         assert_eq!(solution1(&path), 1928);
     }
-    //
-    //#[test]
-    //fn example_day9_2() {
-    //    assert!(false, "todo")
-    //}
+
+    #[test]
+    fn example_day9_2() {
+        let path = common::get_test_data_path("day9/case1.txt").unwrap();
+        assert_eq!(solution2(&path), 99999);
+    }
 }
