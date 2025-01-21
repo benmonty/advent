@@ -125,8 +125,19 @@ pub fn solution2(path: &PathBuf) -> usize {
     _solution2(&input)
 }
 
-pub fn _solution2(_input: &String) -> usize {
-    0
+pub fn _solution2(input: &String) -> usize {
+    let topo_map = TopoMap::from(&input);
+    let trailheads = topo_map.get_trailheads();
+    let mut result = 0;
+    for th in trailheads.iter() {
+        let trails = topo_map.get_trails(*th);
+        for t in trails.iter() {
+            if t.len() == 10 {
+                result += 1;
+            }
+        }
+    }
+    result
 }
 
 #[cfg(test)]
@@ -158,6 +169,8 @@ mod tests  {
 
     #[test]
     fn _example_day2() {
-        assert!(false, "todo")
+        let path = common::get_test_data_path("day10/case1.txt").unwrap();
+        let result = solution2(&path);
+        assert_eq!(result, 81);
     }
 }
