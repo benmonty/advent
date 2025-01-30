@@ -47,12 +47,132 @@ impl Region {
     pub fn get_cost(&self) -> usize {
         self.get_area() * self.get_perimeter()
     }
+
+    pub fn get_reduced_cost(&self) -> usize {
+        self.get_area() * self.get_num_sides()
+    }
+
+    pub fn _get_min_max_corners(&self, plots: &FxHashSet<Icoord>) -> (Icoord, Icoord) {
+        let (mut min_x, mut max_x) = (isize::MAX, isize::MIN);
+        let (mut min_y, mut max_y) = (isize::MAX, isize::MIN);
+
+        for plot in plots.iter() {
+            if plot.x < min_x {
+                min_x = plot.x;
+            }
+            if plot.x > max_x {
+                max_x = plot.x;
+            }
+            if plot.y < min_y {
+                min_y = plot.y;
+            }
+            if plot.y > max_y {
+                max_y = plot.y;
+            }
+        }
+        (Icoord { x: min_x, y: min_y }, Icoord { x: max_x, y: max_y })
+    }
+
+    pub fn _get_upper_sides(&self, plots: &FxHashSet<Icoord>) -> usize {
+        let (min_corner, max_corner) = self._get_min_max_corners(&plots);
+        let mut count = 0;
+
+        for y in min_corner.y..=max_corner.y {
+            // track per y line
+            let mut tracking_side = false;
+
+            for x in min_corner.x..=max_corner.x {
+                let c = Icoord { x, y };
+                match plots.get(&c) {
+                    Some(_) => {
+                        if tracking_side {
+                            if plots.contains(&get_up_coord(&c)) {
+                                // tracking, found above
+                                // stop tracking
+                                tracking_side = false
+                            } else {
+                                // tracking, found above
+                                // do nothing, keep tracking
+                            }
+
+                        } else {
+                            if plots.contains(&get_up_coord(&c)) {
+                                // not tracking, found above
+                                // do nothing
+                            } else {
+                                // not tracking, did not find above
+                                // start tracking a new side
+                                count += 1;
+                                tracking_side = true;
+                            }
+                        }
+                    },
+                    None => {
+                        if tracking_side {
+                            tracking_side = false;
+                        } else {
+                            // do nothing
+                        }
+                    }
+                }
+            }
+        }
+        count
+    }
+
+    pub fn transform_plots(&self, transform: (isize, isize, isize, isize)) -> FxHashSet<Icoord> {
+        let mut result = FxHashSet::default();
+        for c in self.plots.iter() {
+            let transformed_c = Icoord {
+                x: transform.0*c.x + transform.1*c.y,
+                y: transform.2*c.x + transform.3*c.y,
+            };
+            result.insert(transformed_c);
+        }
+        result
+    }
+
+    pub fn get_upper_sides(&self) -> usize {
+        let plots = self.plots.clone();
+        self._get_upper_sides(&plots)
+    }
+
+    pub fn get_lower_sides(&self) -> usize {
+        let plots = self.transform_plots((-1, 0, 0, -1));
+        self._get_upper_sides(&plots)
+    }
+
+    pub fn get_left_sides(&self) -> usize {
+        let plots = self.transform_plots((0, 1, -1, 0));
+        self._get_upper_sides(&plots)
+    }
+
+    pub fn get_right_sides(&self) -> usize {
+        let plots = self.transform_plots((0, -1, 1, 0));
+        self._get_upper_sides(&plots)
+    }
+
+    pub fn get_num_sides(&self) -> usize {
+        let upper = self.get_upper_sides();
+        let lower = self.get_lower_sides();
+        let left = self.get_left_sides();
+        let right = self.get_right_sides();
+
+        upper + lower + left + right
+    }
 }
 
 pub struct Garden {
     plots: FxHashMap<Icoord, PlantType>,
     width: isize,
     height: isize,
+}
+
+fn get_up_coord(c: &Icoord) -> Icoord {
+    Icoord {
+        x: c.x + 0,
+        y: c.y + 1,
+    }
 }
 
 fn get_neighboring_coords(c: &Icoord) -> Vec<Icoord> {
@@ -187,7 +307,12 @@ pub fn solution2(path: &PathBuf) -> usize {
 }
 
 pub fn _solution2(input: &String) -> usize {
-    0
+    let garden = Garden::from(&input);
+    let mut cost = 0;
+    for region in garden.get_regions().iter() {
+        cost += region.get_reduced_cost();
+    }
+    cost
 }
 
 #[cfg(test)]
@@ -203,7 +328,9 @@ mod tests  {
     }
 
     #[test]
-    fn test_example_day2() {
-        assert!(false, "todo")
+    fn test_example_day12_2() {
+        let path = common::get_test_data_path("day12/case1.txt").unwrap();
+        let result = solution2(&path);
+        assert_eq!(result, 1206);
     }
 }
