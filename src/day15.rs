@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::fmt;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap,FxHashSet};
 
 pub mod constants {
     pub const INPUT_PATH: &str = "day15/input.txt";
@@ -17,6 +17,8 @@ pub mod constants {
     pub const CHAR_BOX: char = 'O';
     pub const CHAR_WALL: char = '#';
     pub const CHAR_EMPTY: char = '.';
+    pub const CHAR_BOX_LEFT: char = '[';
+    pub const CHAR_BOX_RIGHT: char = ']';
 
 }
 
@@ -37,6 +39,8 @@ pub enum Entity {
     Robot,
     Wall,
     Box,
+    BoxLeft,
+    BoxRight,
 }
 
 #[derive(Debug)]
@@ -87,6 +91,19 @@ pub fn _loc_i(x: isize, y: isize) -> Loc {
     Loc { x, y }
 }
 
+pub fn expand_warehouse(input: &String) -> String {
+    let result: String = input.chars().map(|c| {
+        match c {
+            constants::CHAR_ROBOT => format!("{}{}", constants::CHAR_ROBOT, constants::CHAR_EMPTY),
+            constants::CHAR_WALL => format!("{}{}", constants::CHAR_WALL, constants::CHAR_WALL),
+            constants::CHAR_EMPTY => format!("{}{}", constants::CHAR_EMPTY, constants::CHAR_EMPTY),
+            constants::CHAR_BOX => format!("{}{}", constants::CHAR_BOX_LEFT, constants::CHAR_BOX_RIGHT),
+            c => format!("{}", c),
+        }
+    }).collect();
+    result
+}
+
 impl Warehouse {
     pub fn from(input: &String) -> Self {
         let map_lines = input.lines().take_while(|l| !l.is_empty());
@@ -113,6 +130,12 @@ impl Warehouse {
                     }
                     constants::CHAR_BOX => {
                         wh.insert(&loc, Some(Entity::Box));
+                    }
+                    constants::CHAR_BOX_LEFT => {
+                        wh.insert(&loc, Some(Entity::BoxLeft));
+                    }
+                    constants::CHAR_BOX_RIGHT => {
+                        wh.insert(&loc, Some(Entity::BoxRight));
                     }
                     constants::CHAR_EMPTY => {
                         wh.insert(&loc, None);
@@ -156,33 +179,85 @@ impl Warehouse {
         }
     }
 
-    pub fn _try_push(&mut self, src: &Loc, dir: &Movement) -> Result<Loc, PushErr> {
+    pub fn _try_push(&mut self, src: &Loc, dir: &Movement, pushes: &mut Vec<(Loc, Loc, bool)>) -> bool {
         let dest = self._get_push_dest(src, dir);
-        match self.map.get(&dest).unwrap() {
-            None => {
-                self._mv(&src, &dest);
-                Ok(dest)
-            },
-            Some(Entity::Box) | Some(Entity::Robot) => {
-                match self._try_push(&dest, &dir) {
-                    Ok(_) => {
-                        self._mv(&src, &dest);
-                        Ok(dest)
+        let dest_entity = self.map.get(&dest).unwrap();
+        let src_entity = self.map.get(&src).unwrap();
+
+        match (dir, dest_entity) {
+            (Movement::Up | Movement::Down, Some(Entity::BoxLeft) | Some(Entity::BoxRight)) => {
+                let (box_l_src, box_r_src);
+
+                if let Some(Entity::BoxLeft) = dest_entity {
+                    box_l_src = dest.clone();
+                    box_r_src = self._get_push_dest(&box_l_src, &Movement::Right);
+                } else {
+                    box_r_src = dest.clone();
+                    box_l_src = self._get_push_dest(&box_r_src, &Movement::Left);
+                }
+
+                let push_left = self._try_push(&box_l_src, &dir, pushes);
+                let push_right = self._try_push(&box_r_src, &dir, pushes);
+
+                match (push_left, push_right) {
+                    (true, true) => {
+                        pushes.push((
+                            src.clone(),
+                            dest,
+                            true
+                        ));
+                        true
                     },
-                    e => e,
+                    _ => {
+                        pushes.push((
+                            src.clone(),
+                            dest,
+                            false
+                        ));
+                        false
+                    }
                 }
             },
-            Some(Entity::Wall) => {
-                Err(PushErr)
+            (_, Some(Entity::Box | Entity::Robot | Entity::BoxLeft | Entity::BoxRight)) => {
+                match self._try_push(&dest, &dir, pushes) {
+                    true => {
+                        pushes.push((
+                            src.clone(),
+                            dest,
+                            true
+                        ));
+                        true
+                    },
+                    _ => {
+                        pushes.push((
+                            src.clone(),
+                            dest,
+                            false
+                        ));
+                        false
+                    },
+                }
+            },
+            (_, Some(Entity::Wall)) => {
+                pushes.push((
+                    src.clone(),
+                    dest,
+                    false
+                ));
+                false
+            },
+            (_, None) => {
+                pushes.push((
+                    src.clone(),
+                    dest,
+                    true
+                ));
+                true
             },
         }
     }
 
     pub fn _mv(&mut self, src: &Loc, dest: &Loc) {
-        println!("######");
-        println!("SRC: {:#?}", src);
-        println!("DEST: {:#?}", dest);
-        println!("######");
         match self.map.get(&dest).unwrap() {
             None => {
                 match self.map.remove(&src).unwrap() {
@@ -198,12 +273,24 @@ impl Warehouse {
     }
 
     pub fn try_push_robot(&mut self, dir: &Movement) -> Result<Loc, PushErr> {
-        match self._try_push(&self.robot_loc.clone(), &dir) {
-            Ok(loc) => {
-                self.robot_loc = loc;
+        let mut pushes = vec![];
+        match self._try_push(&self.robot_loc.clone(), &dir, &mut pushes) {
+            true => {
+                //println!("{:?}", pushes);
+                let mut push_history: FxHashSet<(Loc, Loc)> = FxHashSet::default();
+                for p in pushes.iter() {
+                    if push_history.contains(&(p.0.clone(), p.1.clone())) {
+                        // don't do it
+                    } else {
+                        self._mv(&p.0, &p.1);
+                        push_history.insert((p.0.clone(), p.1.clone()));
+                    }
+                }
+                let last_push = pushes.last().unwrap();
+                self.robot_loc = last_push.1.clone();
                 Ok(self.robot_loc.clone())
             },
-            e => e,
+            false => Err(PushErr),
         }
     }
 
@@ -236,6 +323,21 @@ impl Warehouse {
         }
         sum
     }
+
+    pub fn compute_scaled_gps_sum(&self) -> isize {
+        let mut sum = 0;
+        for y in 0..self.dimensions.y {
+            for x in 0..self.dimensions.x {
+                match self.map.get(&Loc { x, y }).unwrap() {
+                    Some(Entity::BoxLeft) => {
+                        sum += 100 * y + x
+                    },
+                    _ => (),
+                }
+            }
+        }
+        sum
+    }
 }
 
 impl fmt::Display for Warehouse {
@@ -249,6 +351,8 @@ impl fmt::Display for Warehouse {
                             Some(Entity::Robot) => write!(f, "{}", constants::CHAR_ROBOT),
                             Some(Entity::Box) => write!(f, "{}", constants::CHAR_BOX),
                             Some(Entity::Wall) => write!(f, "{}", constants::CHAR_WALL),
+                            Some(Entity::BoxLeft) => write!(f, "{}", constants::CHAR_BOX_LEFT),
+                            Some(Entity::BoxRight) => write!(f, "{}", constants::CHAR_BOX_RIGHT),
                             None => write!(f, "{}", constants::CHAR_EMPTY)
                         }
                     },
@@ -271,21 +375,30 @@ pub fn _solution1(input: &String) -> isize {
     let mut wh = Warehouse::from(&input);
     let moves = parse_movements(&input);
 
-    print!("{}", wh);
     for mv in moves {
         let _ = wh.try_push_robot(&mv);
-        print!("{}", wh);
     }
+    //print!("{}", wh);
     wh.compute_gps_sum()
 }
 
-pub fn solution2(path: &PathBuf) -> usize {
+pub fn solution2(path: &PathBuf) -> isize {
     let input =  fs::read_to_string(path).unwrap();
     _solution2(&input)
 }
 
-pub fn _solution2(_input: &String) -> usize {
-    0
+pub fn _solution2(input: &String) -> isize {
+    let expanded_input = expand_warehouse(&input);
+    let mut wh = Warehouse::from(&expanded_input);
+    let moves = parse_movements(&input);
+
+    //print!("{}", wh);
+    for mv in moves {
+        //println!("{:?}", mv);
+        let _ = wh.try_push_robot(&mv);
+        //print!("{}", wh);
+    }
+    wh.compute_scaled_gps_sum()
 }
 
 #[cfg(test)]
@@ -308,7 +421,9 @@ mod tests  {
     }
 
     #[test]
-    fn test_example_day2() {
-        assert!(false, "todo")
+    fn test_example_day_15_2_1() {
+        let path = common::get_test_data_path("day15/case1.txt").unwrap();
+        let result = solution2(&path);
+        assert_eq!(result, 9021);
     }
 }
