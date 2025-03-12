@@ -177,14 +177,9 @@ impl RobotController {
                 let key_paths_to_solve = controller.solve_root_seq(&key_seq);
                 let mut result = vec![];
                 for key_group_paths in key_paths_to_solve.iter() {
-                    //println!("KEY_GROUP_PATHS");
-                    //println!("{:#?}", key_group_paths);
-                    // [Up, Press]
                     let mut key_group_results: Vec<Vec<ArmOp>> = vec![];
 
                     for key_path in key_group_paths.iter() {
-                        //println!("KEY_PATH");
-                        //println!("{:#?}", key_path);
                         let mut pos = Key::A;
                         let mut key_path_results: Vec<Vec<ArmOp>> = vec![];
                         for op in key_path.iter() {
@@ -195,13 +190,26 @@ impl RobotController {
                             }
                             if key_path_results.len() > 0 {
                                 let mut next_key_path_results = vec![];
+                                let mut best_directional_changes = isize::MAX;
                                 for i in 0..key_path_results.len() {
                                     for j in 0..shortest_paths.len() {
                                         let mut kp = key_path_results[i].clone();
                                         let mut sp = shortest_paths[j].clone();
                                         kp.append(&mut sp);
-
-                                        next_key_path_results.append(&mut vec![kp]);
+                                        let mut prev_d = &kp[0];
+                                        let mut dir_changes = 0;
+                                        for d in kp[1..].iter() {
+                                            if prev_d != d {
+                                                dir_changes += 1;
+                                            }
+                                            prev_d = d;
+                                        }
+                                        if dir_changes < best_directional_changes {
+                                            next_key_path_results = vec![kp];
+                                            best_directional_changes = dir_changes;
+                                        } else if dir_changes == best_directional_changes {
+                                            //next_key_path_results.append(&mut vec![kp]);
+                                        }
                                     }
                                 }
                                 key_path_results = next_key_path_results;
@@ -214,8 +222,6 @@ impl RobotController {
                     }
                     result.append(&mut vec![key_group_results]);
                 }
-                //println!("NON-ROOT");
-                //println!("{:#?}", result);
                 return result;
             },
             None => {
@@ -229,8 +235,6 @@ impl RobotController {
                     result.append(&mut vec![shortest_paths]);
                     pos = k.clone();
                 }
-                //println!("ROOT");
-                //println!("{:#?}", result);
                 return result;
             }
         };
@@ -244,24 +248,18 @@ pub fn _best_paths(keypad: &Keypad, src_key: &Key, dest_key: &Key, best_paths: &
     let mut next_src_keys: Vec<Key> = vec![];
     let src_bests = best_paths.get(&src_key).unwrap().clone();
     for (dir, key) in keypad.links.get(src_key).unwrap().iter() {
-        //dbg!(dir, key);
         if best_paths.contains_key(&key) {
             let existing_bests = best_paths.get(&key).unwrap().clone();
             if src_bests[0].len() + 1 < existing_bests[0].len() {
                 let mut current_bests = src_bests.clone();
-                //println!("replace new best");
-                //dbg!(&current_bests);
                 for i in 0..current_bests.len() {
                     current_bests[i].push(dir.clone());
                 }
                 next_src_keys.push(key.clone());
                 best_paths.entry(key.clone()).and_modify(|b| *b = current_bests);
-                //dbg!(best_paths.get(&key.clone()).unwrap());
             } else if src_bests[0].len() + 1 == existing_bests[0].len() {
-                //println!("add new best");
                 let mut current_bests = src_bests.clone();
                 let mut to_add_bests = vec![];
-                //dbg!(&current_bests);
                 for i in 0..current_bests.len() {
                     current_bests[i].push(dir.clone());
                     if !best_paths.get(&key.clone()).unwrap().contains(&current_bests[i]) {
@@ -269,7 +267,6 @@ pub fn _best_paths(keypad: &Keypad, src_key: &Key, dest_key: &Key, best_paths: &
                     }
                 }
                 best_paths.entry(key.clone()).and_modify(|b| b.append(&mut to_add_bests));
-                //dbg!(best_paths.get(&key.clone()).unwrap());
                 next_src_keys.push(key.clone());
             }
         } else {
@@ -280,7 +277,6 @@ pub fn _best_paths(keypad: &Keypad, src_key: &Key, dest_key: &Key, best_paths: &
             best_paths.entry(key.clone()).or_insert(current_bests);
             next_src_keys.push(key.clone());
         }
-        //println!("");
     }
     for key in next_src_keys.iter() {
         _best_paths(&keypad, &key, &dest_key, best_paths);
@@ -422,28 +418,27 @@ pub fn render_all(ops: &Vec<Vec<Vec<ArmOp>>>) {
     }
 }
 
+pub fn compute_shortest_seq(controller: &RobotController, code: &Vec<Key>) -> isize {
+    let key_solutions = controller.solve_root_seq(&code);
+    let mut total_best = 0;
+    for i in 0..key_solutions.len() {
+        let mut best = key_solutions[i][0].len();
+        for j in 0..key_solutions[i].len() {
+            if key_solutions[i][j].len() < best {
+                best = key_solutions[i][j].len();
+            }
+        }
+        total_best += best;
+    }
+    isize::try_from(total_best).unwrap()
+}
+
 pub fn compute_complexity(controller: &RobotController, codes: &Vec<Vec<Key>>) -> isize {
     let mut total_complexity = 0;
     for code in codes.iter() {
-        dbg!(&code);
-        let mut total_best = 0;
-        let key_solutions = controller.solve_root_seq(&code);
-        //render_all(&key_solutions);
-        for i in 0..key_solutions.len() {
-            let mut best = key_solutions[i][0].len();
-            for j in 0..key_solutions[i].len() {
-                if key_solutions[i][j].len() < best {
-                    best = key_solutions[i][j].len();
-                }
-            }
-            total_best += best;
-        }
-        let shortest_seq_len = isize::try_from(total_best).unwrap();
-        println!("shortest: {}", shortest_seq_len);
+        let shortest_seq_len = compute_shortest_seq(&controller, &code);
         let numeric = numeric_complexity_component(&code);
-        println!("numeric: {}", numeric);
         total_complexity += shortest_seq_len * numeric;
-        println!("");
     }
     total_complexity
 }
@@ -474,18 +469,71 @@ pub fn solution2(path: &PathBuf) -> isize {
     _solution2(&codes)
 }
 
-pub fn _solution2(codes: &Vec<Vec<Key>>) -> isize {
-    let mut controller = RobotController {
+#[derive(Hash, Eq, PartialEq, Debug, Clone)]
+pub struct ContenderKey(Vec<ArmOp>, isize);
+
+pub fn find_min_presses(contender: &Vec<ArmOp>, depth: isize, score_cache: &mut FxHashMap<ContenderKey, isize>) -> isize {
+    let controller = RobotController {
+        keypad: Keypad::create_directional(),
+        child: None,
+    };
+    let key = ContenderKey(contender.clone(), depth);
+    if score_cache.contains_key(&key) {
+        return *score_cache.get(&key).unwrap();
+    }
+    if depth == 0 {
+        score_cache.entry(key).or_insert(isize::try_from(contender.len()).unwrap());
+        return isize::try_from(contender.len()).unwrap();
+    }
+
+    let keys = contender.iter().map(|op| op_to_key(op)).collect();
+    let contenders = controller.solve_root_seq(&keys);
+    let mut score = 0;
+    for key_contender_group in contenders.iter() {
+        let mut min_presses = isize::MAX;
+        for key_contender in key_contender_group.iter() {
+            let presses = find_min_presses(key_contender, depth - 1, score_cache);
+            if presses < min_presses {
+                min_presses = presses;
+            }
+        }
+        score += min_presses;
+    }
+    score_cache.entry(key).or_insert(score);
+    score
+}
+
+fn solution_for_robots(codes: &Vec<Vec<Key>>, directional_robots: isize) -> isize {
+    let controller = RobotController {
         keypad: Keypad::create_numeric(),
         child: None,
     };
-    for _i in 0..25 {
-        controller = RobotController {
-            keypad: Keypad::create_directional(),
-            child: Some(Box::new(controller))
+    let mut press_cache = FxHashMap::default();
+    let mut result = 0;
+    for i in 0..codes.len() {
+        let mut code_sum = 0;
+        let key_contender_groups = controller.solve_root_seq(&codes[i]);
+        for key_contender_group in key_contender_groups.iter() {
+            let mut group_min = isize::MAX;
+            for key_contender in key_contender_group.iter() {
+                for i in 0..directional_robots {
+                    find_min_presses(key_contender, i, &mut press_cache);
+                }
+                let min_presses = find_min_presses(key_contender, directional_robots, &mut press_cache);
+                if min_presses < group_min {
+                    group_min = min_presses;
+                }
+            }
+            code_sum += group_min;
         }
+        let numeric = numeric_complexity_component(&codes[i]);
+        result += code_sum * numeric;
     }
-    compute_complexity(&controller, &codes)
+    result
+}
+
+pub fn _solution2(codes: &Vec<Vec<Key>>) -> isize {
+    solution_for_robots(&codes, 25)
 }
 
 #[cfg(test)]
@@ -511,7 +559,6 @@ mod tests  {
                 paths,
                 vec![
                     vec![ArmOp::Up, ArmOp::Left, ArmOp::Left],
-                    vec![ArmOp::Left, ArmOp::Up, ArmOp::Left],
                 ]
             );
         }
@@ -520,7 +567,6 @@ mod tests  {
             assert_eq!(
                 paths,
                 vec![
-                    vec![ArmOp::Right, ArmOp::Down, ArmOp::Right],
                     vec![ArmOp::Right, ArmOp::Right, ArmOp::Down],
                 ]
             );
@@ -531,25 +577,11 @@ mod tests  {
                 paths,
                 vec![
                     vec![ArmOp::Left, ArmOp::Left, ArmOp::Down],
-                    vec![ArmOp::Left, ArmOp::Down, ArmOp::Left],
                     vec![ArmOp::Down, ArmOp::Left, ArmOp::Left],
                 ]
             );
         }
     }
-
-    //#[test]
-    //fn day_21_1_1_directional() {
-    //    let kp = Keypad::create_directional();
-    //    {
-    //        let path = shortest_path(&kp, &Key::A, &Key::Left);
-    //        assert_eq!(path, vec![ArmOp::Down, ArmOp::Left, ArmOp::Left]);
-    //    }
-    //    {
-    //        let path = shortest_path(&kp, &Key::Left, &Key::A);
-    //        assert_eq!(path, vec![ArmOp::Right, ArmOp::Right, ArmOp::Up]);
-    //    }
-    //}
 
     #[test]
     fn day_21_1_2() {
@@ -567,7 +599,10 @@ mod tests  {
         };
         let code = vec![Key::Zero, Key::Two, Key::Nine, Key::A];
         let result = dir_controller2.solve_root_seq(&code);
-        assert_eq!(result.len(), 68);
+        assert_eq!(result.len(), 4);
+
+        let shortest = compute_shortest_seq(&dir_controller2, &code);
+        assert_eq!(shortest, 68);
     }
 
     #[test]
@@ -584,6 +619,13 @@ mod tests  {
 
     #[test]
     fn day_21_2_1() {
-        assert!(false, "todo")
+        let result = solution_for_robots(&vec![
+            vec![Key::Zero, Key::Two, Key::Nine, Key::A],
+            vec![Key::Nine, Key::Eight, Key::Zero, Key::A],
+            vec![Key::One, Key::Seven, Key::Nine, Key::A],
+            vec![Key::Four, Key::Five, Key::Six, Key::A],
+            vec![Key::Three, Key::Seven, Key::Nine, Key::A],
+        ], 2);
+        assert_eq!(result, 126384);
     }
 }
