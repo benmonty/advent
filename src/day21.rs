@@ -1,8 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
-use std::collections::VecDeque;
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Key {
